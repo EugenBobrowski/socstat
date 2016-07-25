@@ -32,15 +32,58 @@ class Soc_Stat_Chart
         $atts = wp_parse_args($atts, array(
             'w' => 19,
             'h' => 9,
-            'ratio' => 1
+            'ratio' => 1,
+            'api_key' => '',
+            'service' => 'social_searcher'
         ));
+
+        if (!method_exists($this, 'get_data_from_' . $atts['service'])) return __('Service not supported');
+
+        $data = call_user_func(array($this, 'get_data_from_' . $atts['service']), $atts);
+
+        if (is_array($data) && isset($data['message'])) return $data['message'];
+
+        var_dump($data);
+
 
         $this->current_id = uniqid();
 
         $ratio = ($atts['ratio']) ? 'ratio' : '';
-        $output = '<div id="' . $this->current_id . '" class="soc-stat-chart ' . $ratio . '" '.
-            'data-width="' . $atts['w'] . '" data-height="' . $atts['h'] . '" '.
-            'style="width: 100%; height: 300px;"></div>';
+        $output = '<div id="' . $this->current_id . '" class="soc-stat-chart ' . $ratio . '" ' .
+            'data-width="' . $atts['w'] . '" data-height="' . $atts['h'] . '" ' .
+            'style="width: 100%; height: 300px;"></div>';;
+        return $output;
+    }
+
+    public function get_data_from_social_searcher($atts)
+    {
+
+        $url = 'https://api.social-searcher.com/v2/search';
+        $args = array();
+
+        if (!empty($atts['api_key'])) $args['key'] = $atts['api_key'];
+        else return array('message' => __('No API key for Social Searcher!'));
+
+        if (!empty($atts['q'])) $args['q'] = $atts['q'];
+        else return array('message' => __('No q-argument for Social Searcher! Keywords for searching. 
+        Exact phrase for searching should be surrounded by double quotes. Minus keywords should have preceding ”-” symbol. 
+        Several keywords can be joined with OR (all capitals) operator.'));
+
+        foreach (array(
+                     'limit', 'page', 'requestid', 'network', 'lang', 'type', 'fields'
+                 ) as $option) {
+            if (!empty($atts[$option])) $args[$option] = $atts[$option];
+        }
+
+        $url = add_query_arg($args, $url);
+
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HEADER, false);
+        $response = curl_exec($ch);
+        curl_close($ch);
+
+        $output = json_decode($response);
 
         return $output;
     }
